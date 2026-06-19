@@ -21,8 +21,8 @@ def main():
         print("\nAlternatively, set it in your shell environment.")
         sys.exit(1)
         
-    # Get model name from environment or use the latest default (Llama 3.3)
-    model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    # Get model name from environment or use the latest stable default (Llama 3.1 8B)
+    model_name = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
     
     print(f"Initializing LangGraph Groq Agent using model '{model_name}'...")
     
@@ -45,7 +45,10 @@ def main():
                 "Follow these steps to answer questions:\n"
                 "1. If you are not absolutely sure about the stock ticker of a company, use the 'search_stock_ticker' tool first.\n"
                 "2. Once you have the stock ticker symbol, use the 'get_stock_price' tool to fetch the price.\n"
-                "3. Respond back with the ticker symbol, company name, exchange, and the current stock price in a clear, user-friendly format."
+                "3. Respond back with the ticker symbol, company name, exchange, and the current stock price in a clear, user-friendly format.\n\n"
+                "IMPORTANT: To call a tool, use the native tool calling mechanism provided by the system. "
+                "Do NOT output raw XML tags like '<function=...>' or '</function>' in your text response. "
+                "Let the framework execute the tool call natively."
             )
         )
         
