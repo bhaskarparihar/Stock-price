@@ -53,7 +53,7 @@ def main():
         agent_executor = create_react_agent(
             llm, 
             tools, 
-            state_modifier=system_message
+            prompt=system_message
         )
         
         print("\nAgent initialized successfully! Type your query below.")
