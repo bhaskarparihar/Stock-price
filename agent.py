@@ -2,8 +2,8 @@ import os
 import sys
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langgraph.prebuilt import create_react_agent
+from langchain_core.messages import SystemMessage
 
 # Import the custom tools
 from tools import get_stock_price, search_stock_ticker
@@ -21,10 +21,10 @@ def main():
         print("\nAlternatively, set it in your shell environment.")
         sys.exit(1)
         
-    # Get model name from environment or use a reliable default
-    model_name = os.getenv("GROQ_MODEL", "llama3-70b-8192")
+    # Get model name from environment or use the latest default (Llama 3.3)
+    model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     
-    print(f"Initializing LangChain Groq Agent using model '{model_name}'...")
+    print(f"Initializing LangGraph Groq Agent using model '{model_name}'...")
     
     try:
         # Initialize ChatGroq LLM
@@ -37,39 +37,31 @@ def main():
         # Define the tools list
         tools = [search_stock_ticker, get_stock_price]
         
-        # Set up system and agent prompt
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
+        # Define the system message instructions
+        system_message = SystemMessage(
+            content=(
                 "You are an expert financial assistant specialized in tracking company stock prices.\n"
                 "Your objective is to provide the current share price of a requested company.\n\n"
                 "Follow these steps to answer questions:\n"
                 "1. If you are not absolutely sure about the stock ticker of a company, use the 'search_stock_ticker' tool first.\n"
                 "2. Once you have the stock ticker symbol, use the 'get_stock_price' tool to fetch the price.\n"
                 "3. Respond back with the ticker symbol, company name, exchange, and the current stock price in a clear, user-friendly format."
-            ),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
+            )
+        )
         
-        # Create the tool-calling agent
-        agent = create_tool_calling_agent(llm, tools, prompt)
-        
-        # Create the agent executor
-        agent_executor = AgentExecutor(
-            agent=agent,
-            tools=tools,
-            verbose=True,
-            handle_parsing_errors=True
+        # Create the ReAct agent using langgraph (the modern replacement for AgentExecutor)
+        agent_executor = create_react_agent(
+            llm, 
+            tools, 
+            state_modifier=system_message
         )
         
         print("\nAgent initialized successfully! Type your query below.")
         print("Example: 'What is the share price of Apple?' or 'Check stock price of Tesla'")
         print("Type 'exit' or 'quit' to close the agent.\n")
         
-        # Empty chat history for the CLI loop
-        chat_history = []
+        # Conversation state (list of messages)
+        messages = []
         
         while True:
             try:
@@ -81,18 +73,22 @@ def main():
                     break
                 
                 print("\nAgent is thinking...")
+                messages.append(("user", user_input))
+                
+                # Invoke the graph agent
                 response = agent_executor.invoke({
-                    "input": user_input,
-                    "chat_history": chat_history
+                    "messages": messages
                 })
                 
-                print(f"\nAgent: {response['output']}\n")
+                # Update the message history with the outputs
+                messages = response["messages"]
                 
-                # Update chat history for context (optional, simple keep-last-few-turns strategy)
-                chat_history.append(("human", user_input))
-                chat_history.append(("ai", response['output']))
-                if len(chat_history) > 10:
-                    chat_history = chat_history[-10:]
+                # The last message is the agent's response
+                print(f"\nAgent: {messages[-1].content}\n")
+                
+                # Limit history length to prevent context window explosion
+                if len(messages) > 20:
+                    messages = messages[-20:]
                     
             except KeyboardInterrupt:
                 print("\nGoodbye!")
